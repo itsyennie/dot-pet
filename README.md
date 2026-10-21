@@ -4,7 +4,6 @@
 
 Windows 화면 구석에서 함께하는 작은 데스크톱 컴패니언입니다. 기본 캐릭터 이름은 **모리**입니다. 캐릭터를 클릭하면 옆에 투명한 말풍선과 입력창이 열리고, 본인의 ChatGPT dot과 대화할 수 있습니다.
 
-<img src="assets/mori-rabbit.png" alt="기본 모리 캐릭터" width="140">
 
 **[Windows 다운로드 · 0.6.1](https://github.com/itsyennie/dot-pet/releases/tag/v0.6.1)** · [문제 신고](https://github.com/itsyennie/dot-pet/issues)
 
