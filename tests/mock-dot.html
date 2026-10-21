@@ -1,0 +1,20 @@
+<!doctype html><html><body>
+<div id="messages"></div>
+<div id="prompt-textarea" contenteditable="true" role="textbox"></div>
+<button aria-label="보내기">Send</button>
+<script>
+document.querySelector('button').onclick = () => {
+  const text = document.querySelector('#prompt-textarea').innerText;
+  const user = document.createElement('div');
+  user.setAttribute('data-message-author-role', 'user');
+  user.textContent = text;
+  document.querySelector('#messages').append(user);
+  document.querySelector('#prompt-textarea').textContent = '';
+  setTimeout(() => {
+    const assistant = document.createElement('div');
+    assistant.setAttribute('data-message-author-role', 'assistant');
+    assistant.innerHTML = '<div class="markdown">반가워!</div>';
+    document.querySelector('#messages').append(assistant);
+  }, 150);
+};
+</script></body></html>

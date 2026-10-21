@@ -1,0 +1,24 @@
+const { contextBridge, ipcRenderer } = require('electron');
+contextBridge.exposeInMainWorld('mori', {
+  getState: () => ipcRenderer.invoke('state:get'),
+  setScale: value => ipcRenderer.invoke('scale:set', value),
+  setStartup: value => ipcRenderer.invoke('startup:set', value),
+  saveDot: (name, url) => ipcRenderer.invoke('dot:save', { name, url }),
+  chooseAvatar: () => ipcRenderer.invoke('dot:avatar'),
+  clearAvatar: () => ipcRenderer.invoke('dot:avatar-clear'),
+  openDot: () => ipcRenderer.invoke('dot:open'),
+  showChat: () => ipcRenderer.invoke('dot:show-chat'),
+  navigateChat: destination => ipcRenderer.invoke('dot:navigate', destination),
+  connectDot: () => ipcRenderer.invoke('dot:connect'),
+  sendDot: text => ipcRenderer.invoke('dot:send', text),
+  receiveDot: () => ipcRenderer.invoke('dot:receive'),
+  getHistory: () => ipcRenderer.invoke('dot:history'),
+  onChunk: callback => ipcRenderer.on('bridge:chunk', (_, text) => callback(text)),
+  showSettings: () => ipcRenderer.invoke('settings:show'),
+  hideSettings: () => ipcRenderer.invoke('settings:hide'),
+  togglePanel: () => ipcRenderer.invoke('panel:toggle'),
+  setPanelHeight: height => ipcRenderer.invoke('panel:height', height),
+  hide: () => ipcRenderer.invoke('pet:hide'),
+  move: (x, y) => ipcRenderer.invoke('pet:move', {x, y}),
+  onState: callback => ipcRenderer.on('state:changed', (_, value) => callback(value))
+});

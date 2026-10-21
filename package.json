@@ -1,0 +1,49 @@
+{
+  "name": "mori-companion",
+  "version": "0.5.10",
+  "private": true,
+  "description": "Dot Pet: a transparent Windows desktop companion for your ChatGPT dot",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer.js && node --check src/chat-shell.js && node --check src/dot-bridge.js && node --check src/connection.js",
+    "dist": "electron-builder --win nsis portable",
+    "test": "electron tests/bridge-smoke.cjs"
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.mori.companion",
+    "productName": "Mori Companion",
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "deleteAppDataOnUninstall": true
+    }
+  },
+  "author": "itsyennie",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/itsyennie/dot-pet.git"
+  },
+  "homepage": "https://github.com/itsyennie/dot-pet",
+  "bugs": {
+    "url": "https://github.com/itsyennie/dot-pet/issues"
+  }
+}

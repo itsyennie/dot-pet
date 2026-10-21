@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>모리와 대화</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #fff4ed; }
+    header { height: 56px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid #f0dcd0; }
+    .brand { font-size: 14px; font-weight: 800; color: #a85642; margin-right: auto; }
+    button { border: 1px solid #e9c9b8; border-radius: 10px; background: #fff; color: #985847; padding: 8px 10px; cursor: pointer; font: inherit; font-size: 12px; }
+    button.primary { color: white; background: #e87f61; border-color: #e87f61; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="brand">♡ 모리</span>
+    <button id="home">로그인 · 홈</button>
+    <button class="primary" id="dot">모리 대화</button>
+    <button id="connect">연결 확인</button><button id="browser">브라우저 ↗</button>
+  </header>
+  <script src="chat-shell.js"></script>
+</body>
+</html>
