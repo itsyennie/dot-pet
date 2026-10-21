@@ -42,6 +42,17 @@ if (view === 'pet') {
   wrap.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') window.mori.togglePanel(); });
   window.mori.onState(s => { state = s; paint(); });
   window.mori.getState().then(s => { state = s; paint(); });
+} else if (view === 'incoming') {
+  app.innerHTML = '<div class="incoming-card"><button class="incoming-dismiss" aria-label="알림 닫기">×</button><button class="incoming-open"><strong class="incoming-name"></strong><span class="incoming-text"></span><span class="incoming-hint">눌러서 대화하기</span></button></div>';
+  const card = app.firstElementChild;
+  window.mori.onIncoming(message => {
+    card.classList.toggle('below', message.below);
+    card.style.setProperty('--tip', `${message.tip - 8}px`);
+    card.querySelector('.incoming-name').textContent = message.name;
+    card.querySelector('.incoming-text').textContent = message.text;
+  });
+  card.querySelector('.incoming-open').onclick = () => window.mori.openIncoming();
+  card.querySelector('.incoming-dismiss').onclick = () => window.mori.dismissIncoming();
 } else if (view === 'bubble') {
   let messages = [], sending = false, notice = '', canRetry = false;
   app.innerHTML = '<div class="bubble-stage"><div class="bubble-feed" id="feed"></div><div class="bubble-bottom" id="bottom"></div></div>';

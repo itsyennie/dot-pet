@@ -3,7 +3,31 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { snapshot, waitForComposer, sendMessage, receiveReply, hasPending, clearPending } = require('./dot-bridge');
 
-const { connectPage } = require('./connection');
+const { connectPage, isDotUrl } = require('./connection');
+const { IncomingReplies } = require('./incoming');
+const { createIncomingWindow } = require('./incoming-window');
+const incomingReplies = new IncomingReplies();
+let incoming, incomingTimer, incomingReading = false, incomingEpoch = 0, incomingWarmupUntil = 0;
+function resetIncoming() { incomingEpoch++; incomingReplies.reset(); incomingWarmupUntil = Date.now() + 6000; incoming?.hide(); }
+function observeIncoming(current) {
+  const text = incomingReplies.observe(current);
+  if (text) incoming?.show(text);
+}
+async function checkIncoming() {
+  const wc = chatView?.webContents;
+  if (incomingReading || !wc || wc.isDestroyed() || wc.isLoadingMainFrame() || !isDotUrl(wc.getURL())) return;
+  incomingReading = true;
+  const epoch = incomingEpoch;
+  try {
+    const current = await snapshot(wc);
+    if (quitting || epoch !== incomingEpoch || wc !== chatView?.webContents || !isDotUrl(current.url) || !current.composer) return;
+    if (bridgeStatus !== 'ready') { bridgeStatus = 'ready'; notify(); }
+    // Allow the initial history to hydrate before treating appended rows as new.
+    if (Date.now() < incomingWarmupUntil) incomingReplies.reset();
+    observeIncoming(current);
+  } catch { /* Retry quietly; explicit connection actions report errors. */ }
+  finally { incomingReading = false; }
+}
 let connectionAttempt = null;
 let pet, panel, settingsWindow, chatWindow, chatView, tray, quitting = false;
 let bridgeStatus = 'login-needed', bridgeBusy = false, moveSaveTimer;
@@ -28,6 +52,7 @@ function setPetBounds(x, y) {
   settings.x = x; settings.y = y;
   pet.setBounds({ x, y, width: s, height: s });
   if (panel?.isVisible()) placePanel();
+  incoming?.place();
   clearTimeout(moveSaveTimer);
   moveSaveTimer = setTimeout(saveSettings, 250);
 }
@@ -36,8 +61,9 @@ function placePanel() {
   const x = p.x + p.width + sizes.panelW + 12 <= d.x + d.width ? p.x + p.width + 12 : p.x - sizes.panelW - 12;
   panel.setBounds({ x: clamp(x, d.x, d.x + d.width - sizes.panelW), y: clamp(p.y, d.y, d.y + d.height - sizes.panelH), width: sizes.panelW, height: sizes.panelH });
 }
-function togglePanel() { if (panel.isVisible()) panel.hide(); else { settings.visible = true; pet.show(); placePanel(); panel.show(); panel.focus(); saveSettings(); } }
-function setVisible(value) { settings.visible = value; value ? pet.show() : (pet.hide(), panel.hide()); saveSettings(); }
+function openPanel() { incoming?.hide(); settings.visible = true; pet.show(); placePanel(); panel.show(); panel.focus(); saveSettings(); }
+function togglePanel() { if (panel.isVisible()) panel.hide(); else openPanel(); }
+function setVisible(value) { settings.visible = value; if (value) pet.show(); else { pet.hide(); panel.hide(); incoming?.hide(); } saveSettings(); }
 function showSettings() {
   if (!settingsWindow || settingsWindow.isDestroyed()) {
     settingsWindow = new BrowserWindow({ width: 352, height: 550, show: false, frame: false, resizable: false, alwaysOnTop: true,
@@ -61,6 +87,9 @@ function ensureChatWindow() {
     chatWindow.loadFile(path.join(__dirname, 'chat-shell.html'));
     chatView = new WebContentsView({ webPreferences: { partition: 'persist:mori-dot-web', backgroundThrottling: false, contextIsolation: true, nodeIntegration: false, sandbox: true } });
     chatWindow.contentView.addChildView(chatView);
+    chatView.webContents.on('did-start-navigation', (_, url, inPlace, mainFrame) => {
+      if (mainFrame && (!inPlace || !isDotUrl(url))) resetIncoming();
+    });
     const resizeChat = () => { const [width, height] = chatWindow.getContentSize(); chatView.setBounds({ x: 0, y: 56, width, height: Math.max(0, height - 56) }); };
     chatWindow.on('resize', resizeChat);
     resizeChat();
@@ -82,7 +111,7 @@ function ensureChatWindow() {
     });
 
     chatWindow.on('close', event => { if (!quitting) { event.preventDefault(); chatWindow.hide(); } });
-    chatWindow.on('closed', () => { chatWindow = null; chatView = null; bridgeStatus = 'login-needed'; if (!quitting) notify(); });
+    chatWindow.on('closed', () => { resetIncoming(); chatWindow = null; chatView = null; bridgeStatus = 'login-needed'; if (!quitting) notify(); });
   }
 }
 function showChat() {
@@ -106,6 +135,8 @@ async function performConnect() {
   bridgeStatus = 'connecting'; notify();
   try {
     const current = await connectPage(chatView.webContents, validDotUrl(settings.dotUrl) ? settings.dotUrl : 'https://chatgpt.com/dots/home');
+    incomingWarmupUntil = 0;
+    observeIncoming(current);
     bridgeStatus = 'ready'; notify();
     return { ok: true, messages: current.messages };
   } catch (error) {
@@ -124,7 +155,9 @@ async function sendDot(text) {
   try {
     ensureChatWindow();
     try {
-      await connectPage(chatView.webContents, settings.dotUrl);
+      const current = await connectPage(chatView.webContents, settings.dotUrl);
+      incomingWarmupUntil = 0;
+      observeIncoming(current);
       bridgeStatus = 'ready'; notify();
     } catch (error) {
       bridgeStatus = 'login-needed'; notify(); showChat();
@@ -169,7 +202,7 @@ function createWindows() {
     w.webContents.on('will-navigate', e => e.preventDefault());
   }
   panel.on('blur', () => panel.hide());
-  panel.on('show', () => { if (bridgeStatus !== 'ready' && !bridgeBusy) connectDot().catch(() => {}); });
+  panel.on('show', () => { incoming?.hide(); if (bridgeStatus !== 'ready' && !bridgeBusy) connectDot().catch(() => {}); });
   pet.on('closed', () => { if (!quitting) app.quit(); });
   const d = screen.getPrimaryDisplay().workArea;
   setPetBounds(settings.x ?? d.x + d.width - 148, settings.y ?? d.y + d.height - 148);
@@ -184,12 +217,19 @@ app.whenReady().then(() => {
     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
   }
   createWindows();
+  incoming = createIncomingWindow({ pet, name: () => settings.dotName,
+    canShow: () => !quitting && settings.visible && pet.isVisible() && !panel.isVisible() && !chatWindow?.isVisible() });
   const iconPath = path.join(__dirname, '..', 'assets', 'tray.png');
   tray = new Tray(nativeImage.createFromPath(iconPath));
   tray.setToolTip('모리');
   tray.on('double-click', () => setVisible(true));
   updateTray();
+  // Resume the saved web session without opening a login window or sending a message.
+  ensureChatWindow();
+  chatView.webContents.loadURL(validDotUrl(settings.dotUrl) ? settings.dotUrl : 'https://chatgpt.com/dots/home').catch(() => {});
+  incomingTimer = setInterval(checkIncoming, 3000);
 });
+app.on('before-quit', () => { quitting = true; clearInterval(incomingTimer); resetIncoming(); });
 app.on('window-all-closed', () => { if (quitting) app.quit(); });
 app.on('activate', () => { if (pet) setVisible(true); });
 ipcMain.handle('state:get', () => publicState());
@@ -223,7 +263,10 @@ ipcMain.handle('dot:save', (_, next) => {
   const url = String(next?.url || '').trim();
   if (!name) throw new Error('이름을 입력해 주세요.');
   if (!validDotUrl(url)) throw new Error('chatgpt.com의 대화 주소를 입력해 주세요.');
-  if (settings.dotUrl !== url) bridgeStatus = 'login-needed';
+  if (settings.dotUrl !== url) {
+    bridgeStatus = 'login-needed'; resetIncoming();
+    if (chatView && !chatView.webContents.isDestroyed()) chatView.webContents.loadURL(url).catch(() => {});
+  }
   settings.dotName = name; settings.dotUrl = url;
   if (chatWindow && !chatWindow.isDestroyed()) chatWindow.setTitle(`${name}와 대화`);
   saveSettings(); return publicState();
@@ -241,6 +284,8 @@ ipcMain.handle('dot:avatar', async () => {
 });
 ipcMain.handle('dot:avatar-clear', () => { settings.avatar = ''; saveSettings(); return publicState(); });
 ipcMain.handle('panel:toggle', togglePanel);
+ipcMain.handle('incoming:open', openPanel);
+ipcMain.handle('incoming:dismiss', () => incoming?.hide());
 ipcMain.handle('panel:height', (_, height) => {
   sizes.panelH = clamp(Math.round(Number(height) || 240), 190, 500);
   if (panel && !panel.isDestroyed()) placePanel();
