@@ -1,6 +1,6 @@
 {
   "name": "mori-companion",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "description": "Dot Pet: a transparent Windows desktop companion for your ChatGPT dot",
   "main": "src/main.js",
@@ -16,7 +16,7 @@
   },
   "build": {
     "appId": "com.mori.companion",
-    "productName": "Mori Companion",
+    "productName": "dot-pet",
     "files": [
       "src/**/*",
       "assets/**/*",
@@ -34,6 +34,8 @@
     },
     "nsis": {
       "oneClick": true,
+      "shortcutName": "dot-pet",
+      "uninstallDisplayName": "dot-pet",
       "deleteAppDataOnUninstall": true
     }
   },

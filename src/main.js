@@ -211,6 +211,13 @@ function createWindows() {
 app.whenReady().then(() => {
   app.setAppUserModelId('com.mori.companion');
   try { settings = { ...settings, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) }; } catch {}
+  // Retarget an existing opt-in startup entry after the executable rename.
+  if (app.isPackaged && path.basename(process.execPath).toLowerCase() === 'dot-pet.exe') {
+    const legacyExe = path.join(path.dirname(process.execPath), 'Mori Companion.exe');
+    if (app.getLoginItemSettings({ path: legacyExe, args: [] }).openAtLogin) {
+      app.setLoginItemSettings({ openAtLogin: true, path: process.execPath, args: [] });
+    }
+  }
   settings.startup = app.getLoginItemSettings({ path: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] }).openAtLogin;
   for (const oldFile of ['api-key.bin', 'chatgpt-auth.bin', 'chatgpt-host.json']) {
     const oldPath = path.join(app.getPath('userData'), oldFile);
