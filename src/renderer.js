@@ -191,7 +191,7 @@ if (view === 'pet') {
 
 } else {
   let notice = '';
-  app.innerHTML = '<div class="shell"><div class="header"><div class="badge">♡</div><div class="title">모리 꾸미기</div><button class="icon-btn" id="close">×</button></div><div class="settings" id="settings"></div></div>';
+  app.innerHTML = '<div class="shell"><div class="header"><div class="badge">♡</div><div class="title">캐릭터 설정</div><button class="icon-btn" id="close">×</button></div><div class="settings" id="settings"></div></div>';
   const screen = document.getElementById('settings');
   function render() {
     if (!state) return;

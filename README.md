@@ -5,7 +5,7 @@
 Windows 화면 구석에서 함께하는 데스크톱 dot 전용 펫입니다. 기본 캐릭터 이름은 **모리**입니다. 캐릭터를 클릭하면 옆에 투명한 말풍선과 입력창이 열리고, 본인의 ChatGPT dot과 대화할 수 있습니다.
 
 
-**[Windows 다운로드 · 0.6.3](https://github.com/itsyennie/dot-pet/releases/tag/v0.6.3)** · [문제 신고](https://github.com/itsyennie/dot-pet/issues)
+**[Windows 다운로드 · 0.6.4](https://github.com/itsyennie/dot-pet/releases/tag/v0.6.4)** · [문제 신고](https://github.com/itsyennie/dot-pet/issues)
 
 ## 화면 미리보기
 
@@ -25,7 +25,7 @@ Windows 화면 구석에서 함께하는 데스크톱 dot 전용 펫입니다. �
 
 ## 설치하고 시작하기
 
-1. 릴리스에서 **Dot-Pet-Setup-0.6.3.exe**를 내려받아 실행합니다. 설치 없이 시험하려면 **Dot-Pet-Portable-0.6.3.exe**를 선택합니다.
+1. 릴리스에서 **Dot-Pet-Setup-0.6.4.exe**를 내려받아 실행합니다. 설치 없이 시험하려면 **Dot-Pet-Portable-0.6.4.exe**를 선택합니다.
 2. 모리 캐릭터를 클릭합니다. 기존 로그인 세션이 있으면 대화를 연결합니다.
 3. 처음 사용하면 열린 원본 대화 창에서 **본인의 ChatGPT 계정**으로 로그인하고 dot 대화를 엽니다. 화면 위의 **연결 확인**을 누르거나 캐릭터를 다시 클릭합니다.
 4. 말풍선에 입력하고 Enter 또는 보내기 버튼을 누릅니다. Shift+Enter는 줄바꿈입니다. 전송을 확인하면 ‘생각 중…’으로 바뀌고 답변이 표시됩니다.
