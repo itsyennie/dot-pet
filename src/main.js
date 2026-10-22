@@ -29,6 +29,7 @@ async function checkIncoming() {
   finally { incomingReading = false; }
 }
 let connectionAttempt = null;
+let chatLoadFailed = false, trayAvatar = null;
 let pet, panel, settingsWindow, chatWindow, chatView, tray, quitting = false;
 let bridgeStatus = 'login-needed', bridgeBusy = false, moveSaveTimer;
 let settings = { x: null, y: null, scale: 1, visible: true, startup: false, dotName: '모리', dotUrl: 'https://chatgpt.com/dots/home', avatar: '' };
@@ -86,6 +87,7 @@ function ensureChatWindow() {
     });
     chatWindow.loadFile(path.join(__dirname, 'chat-shell.html'));
     chatView = new WebContentsView({ webPreferences: { partition: 'persist:mori-dot-web', backgroundThrottling: false, contextIsolation: true, nodeIntegration: false, sandbox: true } });
+    chatLoadFailed = false;
     chatWindow.contentView.addChildView(chatView);
     chatView.webContents.on('did-start-navigation', (_, url, inPlace, mainFrame) => {
       if (mainFrame && (!inPlace || !isDotUrl(url))) resetIncoming();
@@ -107,7 +109,11 @@ function ensureChatWindow() {
       event.preventDefault();
     });
     chatView.webContents.on('did-fail-load', (_, code, description, failedUrl, isMainFrame) => {
-      if (isMainFrame && code !== -3) chatWindow.setTitle(`모리 대화 · 연결 오류: ${description}`);
+      if (isMainFrame && code !== -3) { chatLoadFailed = true; chatWindow.setTitle(`모리 대화 · 연결 오류: ${description}`); }
+    });
+    chatView.webContents.on('did-finish-load', () => {
+      chatLoadFailed = false;
+      chatWindow.setTitle(`${settings.dotName}와 대화`);
     });
 
     chatWindow.on('close', event => { if (!quitting) { event.preventDefault(); chatWindow.hide(); } });
@@ -116,7 +122,17 @@ function ensureChatWindow() {
 }
 function showChat() {
   ensureChatWindow();
-  if (!chatView.webContents.getURL()) chatView.webContents.loadURL(settings.dotUrl).catch(() => {});
+  const wc = chatView.webContents;
+  const url = wc.getURL();
+  if (!wc.isLoadingMainFrame() && (!url || url === 'about:blank' || url.startsWith('chrome-error:') || chatLoadFailed)) {
+    wc.loadURL(validDotUrl(settings.dotUrl) ? settings.dotUrl : 'https://chatgpt.com/dots/home').catch(() => { chatLoadFailed = true; });
+  }
+  panel?.hide(); incoming?.hide(); settingsWindow?.hide();
+  if (chatWindow.isMinimized()) chatWindow.restore();
+  const bounds = chatWindow.getBounds(), area = screen.getDisplayMatching(bounds).workArea;
+  if (bounds.x < area.x || bounds.y < area.y || bounds.x + bounds.width > area.x + area.width || bounds.y + bounds.height > area.y + area.height) {
+    chatWindow.setBounds({ x: area.x + Math.max(0, Math.floor((area.width - bounds.width) / 2)), y: area.y + Math.max(0, Math.floor((area.height - bounds.height) / 2)), width: Math.min(bounds.width, area.width), height: Math.min(bounds.height, area.height) });
+  }
   chatWindow.show();
   chatWindow.focus();
 }
@@ -173,11 +189,20 @@ async function sendDot(text) {
 }
 function updateTray() {
   if (!tray) return;
+  if (trayAvatar !== settings.avatar) {
+    let icon;
+    try { icon = settings.avatar ? nativeImage.createFromDataURL(settings.avatar) : nativeImage.createFromPath(path.join(__dirname, '..', 'assets', 'mori-rabbit.png')); } catch {}
+    if (!icon || icon.isEmpty()) icon = nativeImage.createFromPath(path.join(__dirname, '..', 'assets', 'mori-rabbit.png'));
+    const size = icon.getSize();
+    tray.setImage(icon.resize(size.width >= size.height ? { width: 32 } : { height: 32 }));
+    trayAvatar = settings.avatar;
+  }
+  tray.setToolTip(`dot-pet · ${settings.dotName}`);
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: settings.visible ? '모리 숨기기' : '모리 표시', click: () => setVisible(!settings.visible) },
     { label: '말풍선 대화 열기', click: togglePanel },
     { label: '꾸미기 · 설정', click: showSettings },
-    { label: 'ChatGPT 로그인 화면', click: showChat },
+    { label: '원본 대화 열기', click: showChat },
     { label: '기본 브라우저에서 열기', click: openDot },
     { type: 'separator' },
     { label: 'Windows 시작 시 실행', type: 'checkbox', checked: settings.startup, click: item => setStartup(item.checked) },
