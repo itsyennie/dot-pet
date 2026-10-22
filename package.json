@@ -1,14 +1,14 @@
 {
   "name": "mori-companion",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "description": "Dot Pet: a transparent Windows desktop companion for your ChatGPT dot",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer.js && node --check src/chat-shell.js && node --check src/dot-bridge.js && node --check src/connection.js && node --check src/incoming.js && node --check src/incoming-window.js",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer.js && node --check src/chat-shell.js && node --check src/dot-bridge.js && node --check src/connection.js && node --check src/incoming.js && node --check src/incoming-window.js && node --check src/message-text.js",
     "dist": "electron-builder --win nsis portable",
-    "test": "node --test tests/incoming.test.cjs && electron tests/bridge-smoke.cjs && electron tests/incoming-smoke.cjs"
+    "test": "node --test tests/incoming.test.cjs && electron tests/bridge-smoke.cjs && electron tests/incoming-smoke.cjs && electron tests/long-message-smoke.cjs"
   },
   "devDependencies": {
     "electron": "45.0.0",

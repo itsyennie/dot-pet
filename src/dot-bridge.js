@@ -1,4 +1,5 @@
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+const { MAX_MESSAGE_LENGTH, normalizeMessage } = require('./message-text');
 
 const snapshotScript = `(() => {
   const editor = document.querySelector('#prompt-textarea, [data-testid="prompt-textarea"], [contenteditable="true"][role="textbox"], textarea');
@@ -40,12 +41,15 @@ const pending = new WeakMap();
 async function sendMessage(webContents, text, onUpdate = () => {}) {
   if (pending.has(webContents)) throw new Error('이전 답변을 먼저 확인해 주세요. 원본 대화를 열어서도 확인할 수 있어요.');
   const content = String(text || '').trim();
-  if (!content || content.length > 4000) throw new Error('메시지는 1~4000자로 입력해 주세요.');
+  if (!content || content.length > MAX_MESSAGE_LENGTH) throw new Error(`메시지는 ${MAX_MESSAGE_LENGTH.toLocaleString('ko-KR')}자 이내로 입력해 주세요. 작성한 글은 입력창에 남아 있어요.`);
   const before = await waitForComposer(webContents);
   if (!webContents.debugger.isAttached()) webContents.debugger.attach('1.3');
   const focused = await webContents.executeJavaScript(`(() => {
     const editor = document.querySelector('#prompt-textarea, [data-testid="prompt-textarea"], [contenteditable="true"][role="textbox"], textarea');
     if (!editor) return false;
+    if (editor.maxLength >= 0 && ${content.length} > editor.maxLength) {
+      return { limit: editor.maxLength };
+    }
     editor.focus();
     if (editor.tagName === 'TEXTAREA') {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
@@ -57,14 +61,16 @@ async function sendMessage(webContents, text, onUpdate = () => {}) {
     }
     return true;
   })()`, true);
+  if (focused && typeof focused.limit === 'number') throw new Error(`원본 입력창의 글자 수 제한(${focused.limit.toLocaleString('ko-KR')}자)을 초과했어요. 글을 줄여 주세요. 작성한 글은 입력창에 남아 있어요.`);
   if (!focused) throw new Error('닷츠 입력창에 접근하지 못했습니다.');
   await webContents.debugger.sendCommand('Input.insertText', { text: content });
   await pause(250);
   const inserted = await webContents.executeJavaScript(`(() => {
     const editor = document.querySelector('#prompt-textarea, [data-testid="prompt-textarea"], [contenteditable="true"][role="textbox"], textarea');
-    return !!editor && (editor.value || editor.innerText || '').includes(${JSON.stringify(content)});
+    const normalize = ${normalizeMessage.toString()};
+    return !!editor && normalize(editor.value ?? editor.innerText ?? editor.textContent ?? '') === normalize(${JSON.stringify(content)});
   })()`, true);
-  if (!inserted) throw new Error('닷츠 입력창에 글을 넣지 못했습니다. 웹페이지에서 직접 입력해 주세요.');
+  if (!inserted) throw new Error('원본 입력창에 글 전체가 들어갔는지 확인하지 못해 전송을 멈췄어요. 작성한 글은 입력창에 남아 있어요.');
   pending.set(webContents, { before, content });
   let clicked = false;
   const clickDeadline = Date.now() + 5000;
@@ -97,7 +103,7 @@ async function receiveReply(webContents, onUpdate = () => {}) {
     const current = await snapshot(webContents);
     const oldIds = new Set(request.before.messages.map(item => item.id));
     const newMessages = current.messages;
-    const boundary = newMessages.findLastIndex(item => item.role === 'user' && item.text.trim() === request.content && !oldIds.has(item.id));
+    const boundary = newMessages.findLastIndex(item => item.role === 'user' && normalizeMessage(item.text) === normalizeMessage(request.content) && !oldIds.has(item.id));
     if (boundary >= 0 && !request.confirmed) { request.confirmed = true; onUpdate('생각 중…'); }
     if (!request.confirmed && Date.now() >= confirmationDeadline) throw new Error('메시지 전송이 확인되지 않았어요. 원본 대화에서 확인해 주세요. 다시 확인은 재전송하지 않아요.');
     const following = boundary >= 0 ? newMessages.slice(boundary + 1) : [];

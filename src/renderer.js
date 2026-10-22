@@ -55,6 +55,14 @@ if (view === 'pet') {
   card.querySelector('.incoming-dismiss').onclick = () => window.mori.dismissIncoming();
 } else if (view === 'bubble') {
   let messages = [], sending = false, notice = '', canRetry = false;
+  let draft = '', confirmed = false, sendIssue = false, historyVersion = 0;
+  const { MAX_MESSAGE_LENGTH } = window.moriText;
+  function confirmSent() {
+    if (confirmed) return;
+    confirmed = true; draft = '';
+    const input = document.getElementById('message');
+    if (input) input.value = '';
+  }
   app.innerHTML = '<div class="bubble-stage"><div class="bubble-feed" id="feed"></div><div class="bubble-bottom" id="bottom"></div></div>';
   const feed = document.getElementById('feed'), bottom = document.getElementById('bottom');
   let resizeFrame = 0;
@@ -76,14 +84,14 @@ if (view === 'pet') {
       const retry = document.createElement('button');
       retry.className = 'connect-pill'; retry.textContent = '답변 다시 확인';
       retry.onclick = async () => {
-        sending = true; notice = '답변을 다시 확인하고 있어요…'; renderMessages();
+        sending = true; notice = '답변을 다시 확인하고 있어요…'; render();
         try {
           const result = await window.mori.receiveDot();
-          if (result.ok) { messages.at(-1).text = result.text; canRetry = false; notice = ''; }
+          if (result.ok) { confirmSent(); messages.at(-1).text = result.text; canRetry = false; sendIssue = false; notice = ''; }
           else { canRetry = result.retryable; notice = result.message; }
         }
         catch (error) { canRetry = false; notice = '연결이 끊겼어요. 원본 대화를 열어 확인해 주세요.'; }
-        finally { sending = false; renderMessages(); }
+        finally { sending = false; render(); }
       };
       feed.appendChild(retry);
     }
@@ -92,13 +100,23 @@ if (view === 'pet') {
   }
   function render() {
     if (!state) return;
-    const draft = document.getElementById('message')?.value || '';
+    const previousInput = document.getElementById('message');
+    if (previousInput) draft = previousInput.value;
     renderMessages();
     if (state.bridgeStatus === 'ready') {
-      bottom.innerHTML = '<div class="compose-pill"><textarea id="message" rows="1" maxlength="4000" placeholder="모리에게 말 걸기…"></textarea><button class="compose-settings" id="settings" title="설정" aria-label="설정">⚙</button><button id="send" aria-label="보내기">➤</button></div><button class="open-original" id="original">원본 대화 열기 ↗</button>';
+      bottom.innerHTML = '<div class="compose-pill"><textarea id="message" rows="1" placeholder="모리에게 말 걸기…"></textarea><button class="compose-settings" id="settings" title="설정" aria-label="설정">⚙</button><button id="send" aria-label="보내기">➤</button></div><div class="compose-count" id="count" aria-live="polite"></div><button class="open-original" id="original">원본 대화 열기 ↗</button>';
       document.getElementById('message').value = draft;
+      document.getElementById('message').readOnly = sending;
+      document.getElementById('send').disabled = sending;
+      const updateDraft = () => {
+        const input = document.getElementById('message'); draft = input.value;
+        document.getElementById('count').textContent = draft.length > 4000 ? `${draft.length.toLocaleString()} / ${MAX_MESSAGE_LENGTH.toLocaleString()}자` : '';
+        input.style.height = 'auto'; input.style.height = `${Math.min(75, input.scrollHeight)}px`; scheduleSize();
+      };
+      document.getElementById('message').oninput = updateDraft;
+      updateDraft();
       document.getElementById('send').onclick = send;
-      document.getElementById('message').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
+      document.getElementById('message').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); send(); } };
     } else {
       const label = state.bridgeStatus === 'connecting' ? '연결 확인 중…' : '모리 대화 연결하기';
       bottom.innerHTML = `<div class="connect-row"><button class="connect-pill" id="connect" ${state.bridgeStatus === 'connecting' ? 'disabled' : ''}>${label}</button><button class="compose-settings" id="settings" title="설정" aria-label="설정">⚙</button></div><button class="open-original" id="original">원본 대화 열기 ↗</button>`;
@@ -109,10 +127,11 @@ if (view === 'pet') {
     scheduleSize();
   }
   async function connect() {
+    historyVersion++;
     notice = ''; state.bridgeStatus = 'connecting'; render();
     try {
       const result = await window.mori.connectDot();
-      if (result.ok) { messages = result.messages.map(m => ({ role: m.role, text: m.text })); notice = ''; canRetry = false; }
+      if (result.ok) { messages = result.messages.map(m => ({ role: m.role, text: m.text })); notice = ''; canRetry = false; sendIssue = false; }
       else notice = result.message;
       state = await window.mori.getState(); render();
     } catch (error) {
@@ -124,31 +143,39 @@ if (view === 'pet') {
     const input = document.getElementById('message');
     const text = input?.value.trim();
     if (!text || sending) return;
+    draft = input.value;
+    if (text.length > MAX_MESSAGE_LENGTH) {
+      sendIssue = true; notice = `한 번에 ${MAX_MESSAGE_LENGTH.toLocaleString()}자까지 보낼 수 있어요. 글을 줄여 주세요. 작성한 내용은 그대로 남아 있어요.`;
+      renderMessages(); return;
+    }
     if (canRetry) { notice = '이전 답변을 먼저 확인해 주세요.'; renderMessages(); return; }
-    sending = true; canRetry = false; notice = '';
+    sending = true; canRetry = false; notice = ''; confirmed = false; sendIssue = false; historyVersion++;
     messages.push({ role: 'user', text }, { role: 'assistant', text: '' });
-    input.value = ''; renderMessages();
+    render();
     try {
       const result = await window.mori.sendDot(text);
-      if (result.ok) messages.at(-1).text = result.text;
+      if (result.ok) { confirmSent(); messages.at(-1).text = result.text; }
       else {
+        sendIssue = true;
         canRetry = result.retryable; notice = result.message;
         if (!messages.at(-1).text || messages.at(-1).text === '생각 중…') messages.at(-1).text = canRetry ? '답변을 아직 확인하지 못했어요.' : '전송 여부를 확인해 주세요.';
       }
     } catch (error) {
+      sendIssue = true;
       if (!messages.at(-1).text || messages.at(-1).text === '생각 중…') messages.at(-1).text = '답변을 확인하지 못했어요.';
       canRetry = false; notice = '연결이 끊겼어요. 원본 대화를 열어 확인해 주세요.';
-    } finally { sending = false; renderMessages(); }
+    } finally { sending = false; render(); }
   }
-  window.mori.onChunk(text => { if (sending && messages.at(-1)?.role === 'assistant') { messages[messages.length - 1].text = text; renderMessages(); } });
+  window.mori.onChunk(text => { if (sending && messages.at(-1)?.role === 'assistant') { confirmSent(); messages[messages.length - 1].text = text; renderMessages(); } });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') window.mori.togglePanel(); });
   let refreshing = false;
   async function refreshHistory() {
-    if (refreshing || sending || canRetry || state?.bridgeStatus !== 'ready' || document.visibilityState !== 'visible') return;
+    if (refreshing || sending || canRetry || sendIssue || state?.bridgeStatus !== 'ready' || document.visibilityState !== 'visible') return;
     refreshing = true;
+    const version = historyVersion;
     try {
       const history = await window.mori.getHistory();
-      if (sending || canRetry || state?.bridgeStatus !== 'ready') return;
+      if (version !== historyVersion || sending || canRetry || sendIssue || state?.bridgeStatus !== 'ready') return;
       const next = history.filter(m => m.text).map(m => ({ role: m.role, text: m.text }));
       if (next.length && JSON.stringify(next) !== JSON.stringify(messages)) { messages = next; notice = ''; renderMessages(); }
     } catch { /* The connect/send action surfaces actionable errors. */ }
