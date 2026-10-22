@@ -2,7 +2,7 @@
 
 **기획·제작: [itsyennie](https://github.com/itsyennie)** · AI 개발 도구 활용 · [공식 저장소](https://github.com/itsyennie/dot-pet)
 
-Windows 화면 구석에서 함께하는 작은 데스크톱 컴패니언입니다. 기본 캐릭터 이름은 **모리**입니다. 캐릭터를 클릭하면 옆에 투명한 말풍선과 입력창이 열리고, 본인의 ChatGPT dot과 대화할 수 있습니다.
+Windows 화면 구석에서 함께하는 데스크톱 dot 전용 펫입니다. 기본 캐릭터 이름은 **모리**입니다. 캐릭터를 클릭하면 옆에 투명한 말풍선과 입력창이 열리고, 본인의 ChatGPT dot과 대화할 수 있습니다.
 
 
 **[Windows 다운로드 · 0.6.3](https://github.com/itsyennie/dot-pet/releases/tag/v0.6.3)** · [문제 신고](https://github.com/itsyennie/dot-pet/issues)
