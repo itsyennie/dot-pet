@@ -1,6 +1,8 @@
 const { app, BrowserWindow, WebContentsView, Tray, Menu, nativeImage, screen, ipcMain, shell, dialog } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
+if (app.isPackaged && !app.requestSingleInstanceLock()) app.exit(0);
+const recovery = app.isPackaged ? require('./recovery').installRecovery(app) : null;
 const { snapshot, waitForComposer, sendMessage, receiveReply, hasPending, clearPending } = require('./dot-bridge');
 
 const { connectPage, isDotUrl } = require('./connection');
@@ -206,6 +208,7 @@ function updateTray() {
     { label: '기본 브라우저에서 열기', click: openDot },
     { type: 'separator' },
     { label: 'Windows 시작 시 실행', type: 'checkbox', checked: settings.startup, click: item => setStartup(item.checked) },
+    { label: '오류 기록 폴더 열기', click: () => { if (recovery) shell.openPath(recovery.dir); } },
     { label: '종료', click: () => { quitting = true; app.quit(); } }
   ]));
 }
@@ -228,7 +231,7 @@ function createWindows() {
   }
   panel.on('blur', () => panel.hide());
   panel.on('show', () => { incoming?.hide(); if (bridgeStatus !== 'ready' && !bridgeBusy) connectDot().catch(() => {}); });
-  pet.on('closed', () => { if (!quitting) app.quit(); });
+  pet.on('closed', () => { if (!quitting) { if (recovery) { recovery.record('pet-window-closed-unexpectedly'); app.exit(1); } else app.quit(); } });
   const d = screen.getPrimaryDisplay().workArea;
   setPetBounds(settings.x ?? d.x + d.width - 148, settings.y ?? d.y + d.height - 148);
   if (settings.visible) pet.showInactive();
@@ -264,6 +267,7 @@ app.whenReady().then(() => {
 app.on('before-quit', () => { quitting = true; clearInterval(incomingTimer); resetIncoming(); });
 app.on('window-all-closed', () => { if (quitting) app.quit(); });
 app.on('activate', () => { if (pet) setVisible(true); });
+app.on('second-instance', () => { if (pet && !pet.isDestroyed()) { setPetBounds(settings.x, settings.y); setVisible(true); } });
 ipcMain.handle('state:get', () => publicState());
 ipcMain.handle('scale:set', (_, value) => { settings.scale = clamp(Number(value) || 1, 0.7, 1.7); setPetBounds(settings.x, settings.y); return publicState(); });
 ipcMain.handle('startup:set', (_, value) => setStartup(value));
