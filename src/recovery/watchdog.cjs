@@ -23,15 +23,23 @@ function recover() {
   try { history = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch {}
   history = Array.isArray(history) ? history.filter(t => Number.isFinite(t) && Date.now() - t < 600000) : [];
   log(dir, 'unexpected-exit', { parentPid });
-  if (history.length >= 5) { log(dir, 'recovery-paused', { reason: 'five-restarts-in-ten-minutes' }); return; }
+  if (history.length >= 5) {
+    log(dir, 'recovery-paused', { reason: 'five-restarts-in-ten-minutes' });
+    try { fs.writeFileSync(path.join(dir, 'recovery-alert-pending'), 'app'); } catch {}
+    launch([...args, '--recovery-alert'], 'recovery-alert-launched');
+    return;
+  }
   history.push(Date.now());
   try { fs.writeFileSync(stateFile, JSON.stringify(history)); } catch {}
+  launch(args, 'restarted');
+}
+function launch(launchArgs, event) {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   try {
-    const child = spawn(executable, args, { detached: true, stdio: 'ignore', windowsHide: true, env });
+    const child = spawn(executable, launchArgs, { detached: true, stdio: 'ignore', windowsHide: true, env });
     child.on('error', error => log(dir, 'restart-failed', { code: error.code }));
-    child.on('spawn', () => log(dir, 'restarted', { pid: child.pid }));
+    child.on('spawn', () => log(dir, event, { pid: child.pid }));
     child.unref();
   } catch (error) { log(dir, 'restart-failed', { code: error.code }); }
 }

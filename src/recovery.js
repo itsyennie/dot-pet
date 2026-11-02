@@ -4,7 +4,7 @@ const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const { log } = require('./recovery/log.cjs');
 
-function installRecovery(app) {
+function installRecovery(app, { onPaused = info => require('./recovery-alert').showRecoveryPaused(info) } = {}) {
   const dir = path.join(app.getPath('userData'), 'diagnostics');
   const cleanFile = path.join(dir, randomUUID() + '.clean');
   const record = (event, details) => log(dir, event, details);
@@ -42,11 +42,18 @@ function installRecovery(app) {
   app.on('child-process-gone', (_, details) => record('child-process-gone', { type: details.type, reason: details.reason, exitCode: details.exitCode }));
   app.on('web-contents-created', (_, contents) => {
     let failures = [];
+    let paused = false;
     contents.on('render-process-gone', (_, details) => {
       record('render-process-gone', { id: contents.id, reason: details.reason, exitCode: details.exitCode });
       if (stopped || details.reason === 'clean-exit') return;
       failures = failures.filter(t => Date.now() - t < 300000);
-      if (failures.length >= 3) { record('renderer-recovery-paused', { id: contents.id }); return; }
+      if (failures.length >= 3) {
+        if (!paused) { paused = true; record('renderer-recovery-paused', { id: contents.id });
+          Promise.resolve().then(() => onPaused({ dir, kind: 'renderer' })).catch(() => record('recovery-alert-failed'));
+        }
+        return;
+      }
+      paused = false;
       failures.push(Date.now());
       setTimeout(() => { if (!stopped && !contents.isDestroyed()) { record('renderer-reload', { id: contents.id }); contents.reload(); } }, 1500);
     });

@@ -238,6 +238,9 @@ function createWindows() {
 }
 app.whenReady().then(() => {
   app.setAppUserModelId('com.mori.companion');
+  if (recovery && fs.existsSync(path.join(recovery.dir, 'recovery-alert-pending'))) {
+    require('./recovery-alert').showRecoveryPaused({ dir: recovery.dir, kind: 'app' });
+  }
   try { settings = { ...settings, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) }; } catch {}
   // Retarget an existing opt-in startup entry after the executable rename.
   if (app.isPackaged && path.basename(process.execPath).toLowerCase() === 'dot-pet.exe') {

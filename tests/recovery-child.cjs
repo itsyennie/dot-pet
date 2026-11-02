@@ -1,6 +1,10 @@
 const { EventEmitter } = require('node:events');
 const fs = require('node:fs');
 const path = require('node:path');
+if (process.argv.includes('--recovery-alert')) {
+  fs.writeFileSync(path.join(process.env.RECOVERY_TEST_DIR, 'alerted'), 'app');
+  process.exit(0);
+}
 const app = new EventEmitter();
 app.getPath = () => process.env.RECOVERY_TEST_DIR;
 app.getVersion = () => 'test';

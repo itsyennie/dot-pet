@@ -27,6 +27,8 @@ for (const mode of ['clean', 'crash', 'exception', 'limit']) test(mode, async ()
     assert.ok(!readLog().includes('restarted'));
   } else if (mode === 'limit') {
     await waitFor(() => readLog().includes('recovery-paused'));
+    await waitFor(() => fs.existsSync(path.join(dir, 'alerted')));
+    assert.ok(fs.existsSync(path.join(logDir, 'recovery-alert-pending')));
     assert.equal(fs.readFileSync(path.join(dir, 'runs'), 'utf8'), '1');
   } else {
     await waitFor(() => readLog().includes('watchdog-stop'));
