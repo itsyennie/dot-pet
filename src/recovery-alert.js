@@ -13,10 +13,11 @@ function showDialog({ title, message }, { BrowserWindow }) {
     window.webContents.on('will-navigate', (event, url) => {
       event.preventDefault();
       if (url === 'https://dot-pet.invalid/logs') { response = 0; window.close(); }
+      if (url === 'https://dot-pet.invalid/restart') { response = 2; window.close(); }
       if (url === 'https://dot-pet.invalid/close') window.close();
     });
-    const html = `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>body{margin:28px;font:14px 'Segoe UI',sans-serif;color:#46372f;background:#fff7f0}h2{font-size:20px;margin:0 0 16px}p{line-height:1.6}nav{display:flex;gap:10px;margin-top:22px}a{padding:10px 16px;border-radius:10px;background:#eb866c;color:white;text-decoration:none;font-weight:600}a:last-child{background:#eadfd7;color:#46372f}</style><h2>${title}</h2><p>${message}<br>오류 기록을 확인한 뒤 앱을 직접 다시 실행해 주세요.</p><nav><a href="https://dot-pet.invalid/logs">오류 기록 열기</a><a href="https://dot-pet.invalid/close">닫기</a></nav>`;
-    window.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html)).then(() => { window.show(); window.focus(); }).catch(error => { window.destroy(); reject(error); });
+    const html = `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>body{margin:28px;font:14px 'Segoe UI',sans-serif;color:#46372f;background:#fff7f0}h2{font-size:20px;margin:0 0 16px}p{line-height:1.6}nav{display:flex;gap:10px;margin-top:22px}a{padding:10px 16px;border-radius:10px;background:#eb866c;color:white;text-decoration:none;font-weight:600}a:last-child{background:#eadfd7;color:#46372f}</style><h2>${title}</h2><p>${message}<br>다시 켜거나 오류 기록을 확인해 주세요.</p><nav><a href="https://dot-pet.invalid/restart">모리 다시 켜기</a><a href="https://dot-pet.invalid/logs">오류 기록 열기</a><a href="https://dot-pet.invalid/close">닫기</a></nav>`;
+    window.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html)).then(() => { window.show(); window.focus(); }).catch(error => { reject(error); window.destroy(); });
   });
 }
 function showRecoveryPaused({ dir, kind }, api = require('electron'), displayDialog = showDialog) {
@@ -47,6 +48,14 @@ function showRecoveryPaused({ dir, kind }, api = require('electron'), displayDia
       if (result.response === 0) await openLogs();
       log(dir, 'recovery-alert-acknowledged', { kind });
       if (kind === 'app') fs.rmSync(path.join(dir, 'recovery-alert-pending'), { force: true });
+      if (result.response === 2) {
+        // A deliberate retry starts a fresh recovery budget without removing diagnostics.
+        fs.writeFileSync(path.join(dir, 'restart-history.json'), '[]');
+        log(dir, 'manual-restart-requested', { kind });
+        api.app.relaunch({ execPath: process.env.PORTABLE_EXECUTABLE_FILE || process.execPath,
+          args: [...(api.app.isPackaged ? [] : [api.app.getAppPath()]), '--recovery-restart'] });
+        api.app.quit();
+      }
     } catch { log(dir, 'recovery-alert-failed', { kind }); }
     finally { try { notification?.close(); } catch {} }
   })().finally(() => { active = null; });

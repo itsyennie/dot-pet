@@ -9,17 +9,19 @@ app.on('window-all-closed',()=>{});
 const timeout = setTimeout(()=>app.exit(1),15000);
 app.whenReady().then(async()=>{
  const dir=app.getPath('userData');
- let opened=0;
- const result=showRecoveryPaused({dir,kind:'app'}, {BrowserWindow,Notification:{isSupported:()=>false},shell:{openPath:async p=>{assert.equal(p,dir);opened++;return '';}}});
+ let opened=0, restarted=0;
+ for (const action of ["logs", "restart"]) {
+ const result=showRecoveryPaused({dir,kind:'app'}, {app:{isPackaged:true,relaunch:options=>{assert.deepEqual(options.args,["--recovery-restart"]);restarted++;},quit:()=>{}},BrowserWindow,Notification:{isSupported:()=>false},shell:{openPath:async p=>{assert.equal(p,dir);opened++;return '';}}});
  let win;
  for(let i=0;i<80;i++) { win=BrowserWindow.getAllWindows()[0]; if(win?.isVisible() && !win.webContents.isLoading())break; await new Promise(r=>setTimeout(r,100)); }
  assert.ok(win?.isVisible());
  assert.match(await win.webContents.executeJavaScript('document.body.innerText'),/자동 복구가 멈췄어요/);
  fs.mkdirSync(path.join(__dirname,'../.test-results'),{recursive:true});
  fs.writeFileSync(path.join(__dirname,'../.test-results/recovery-alert.png'),(await win.webContents.capturePage()).toPNG());
- await win.webContents.executeJavaScript('document.querySelector("a").click()');
+ await win.webContents.executeJavaScript(`document.querySelector('a[href="https://dot-pet.invalid/${action}"]').click()`);
  await result;
- assert.equal(opened,1);
- console.log('PASS visible recovery alert, text, diagnostics action and close');
+ }
+ assert.equal(opened,1); assert.equal(restarted,1);
+ console.log('PASS visible recovery alert, text, diagnostics and restart buttons');
  clearTimeout(timeout);app.quit();
 }).catch(e=>{console.error(e);app.exit(1);});

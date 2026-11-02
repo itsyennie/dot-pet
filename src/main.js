@@ -242,6 +242,7 @@ app.whenReady().then(() => {
     require('./recovery-alert').showRecoveryPaused({ dir: recovery.dir, kind: 'app' });
   }
   try { settings = { ...settings, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) }; } catch {}
+  if (process.argv.includes('--recovery-restart')) settings.visible = true;
   // Retarget an existing opt-in startup entry after the executable rename.
   if (app.isPackaged && path.basename(process.execPath).toLowerCase() === 'dot-pet.exe') {
     const legacyExe = path.join(path.dirname(process.execPath), 'Mori Companion.exe');
