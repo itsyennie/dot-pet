@@ -32,6 +32,7 @@ async function checkIncoming() {
 }
 let connectionAttempt = null;
 let chatLoadFailed = false, trayAvatar = null;
+let updater;
 let pet, panel, settingsWindow, chatWindow, chatView, tray, quitting = false;
 let bridgeStatus = 'login-needed', bridgeBusy = false, moveSaveTimer;
 let settings = { x: null, y: null, scale: 1, visible: true, startup: false, dotName: '모리', dotUrl: 'https://chatgpt.com/dots/home', avatar: '' };
@@ -209,6 +210,7 @@ function updateTray() {
     { type: 'separator' },
     { label: 'Windows 시작 시 실행', type: 'checkbox', checked: settings.startup, click: item => setStartup(item.checked) },
     { label: '오류 기록 폴더 열기', click: () => { if (recovery) shell.openPath(recovery.dir); } },
+    { label: '업데이트 확인', click: () => { updater?.check(true).catch(() => {}); } },
     { label: '종료', click: () => { quitting = true; app.quit(); } }
   ]));
 }
@@ -264,11 +266,15 @@ app.whenReady().then(() => {
   tray.on('double-click', () => setVisible(true));
   updateTray();
   // Resume the saved web session without opening a login window or sending a message.
+  if (app.isPackaged) {
+    updater = require('./updates').createUpdater({ current: app.getVersion(), dir: app.getPath('userData'), notify: require('./update-window').showUpdate });
+    updater.start();
+  }
   ensureChatWindow();
   chatView.webContents.loadURL(validDotUrl(settings.dotUrl) ? settings.dotUrl : 'https://chatgpt.com/dots/home').catch(() => {});
   incomingTimer = setInterval(checkIncoming, 3000);
 });
-app.on('before-quit', () => { quitting = true; clearInterval(incomingTimer); resetIncoming(); });
+app.on('before-quit', () => { quitting = true; updater?.stop(); clearInterval(incomingTimer); resetIncoming(); });
 app.on('window-all-closed', () => { if (quitting) app.quit(); });
 app.on('activate', () => { if (pet) setVisible(true); });
 app.on('second-instance', () => { if (pet && !pet.isDestroyed()) { setPetBounds(settings.x, settings.y); setVisible(true); } });
